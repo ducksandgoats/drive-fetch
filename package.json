@@ -1,5 +1,5 @@
 {
-  "name": "hypercore-fetch",
+  "name": "hypercore-handler",
   "version": "8.5.0",
   "description": "Implementation of Fetch that uses the Dat SDK for loading p2p content",
   "bin": {
