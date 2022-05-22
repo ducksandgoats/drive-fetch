@@ -66,7 +66,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         const usePath = mid.usePath + info.filename
         data.push(usePath)
         try {
-          push(app.Hyperdrive(mid.useHost).write(usePath, Readable.from(fileData)))
+          push(app.Hyperdrive(mid.useHost).writeFile(usePath, Readable.from(fileData)))
         } catch (e) {
           fail(e)
         }
