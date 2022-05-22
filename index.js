@@ -4,6 +4,7 @@ const parseRange = require('range-parser')
 const { Readable } = require('stream')
 const makeFetch = require('make-fetch')
 const { EventIterator } = require('event-iterator')
+const Busboy = require('busboy')
 const path = require('path')
 
 module.exports = async function makeHyperFetch (opts = {}) {
@@ -45,7 +46,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
   async function saveData (mid, content, useHeaders, timer) {
     const data = []
-    const busboy = new Busboy({ headers: useHeaders })
+    const busboy = Busboy({ headers: useHeaders })
 
     const toUpload = new EventIterator(({ push, stop, fail }) => {
       function handleOff(){

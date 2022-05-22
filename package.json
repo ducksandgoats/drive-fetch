@@ -1,6 +1,6 @@
 {
   "name": "log-fetch",
-  "version": "8.5.1",
+  "version": "8.5.2",
   "description": "Implementation of Fetch that uses the Dat SDK for loading p2p content",
   "bin": {
     "hypercore-fetch": "bin.js"
@@ -24,12 +24,12 @@
   },
   "homepage": "https://github.com/ducksandgoats/log-fetch#readme",
   "dependencies": {
+    "busboy": "^1.6.0",
     "event-iterator": "^2.0.0",
     "hyper-sdk": "^3.0.9",
     "make-fetch": "^2.2.1",
     "mime": "^2.4.4",
-    "range-parser": "^1.2.1",
-    "sodium-universal": "^3.0.2"
+    "range-parser": "^1.2.1"
   },
   "devDependencies": {
     "random-access-memory": "^3.1.1",
