@@ -10,7 +10,7 @@ const path = require('path')
 module.exports = async function makeHyperFetch (opts = {}) {
   const DEFAULT_OPTS = {}
   const finalOpts = { ...DEFAULT_OPTS, ...opts }
-  const app = await (async (anonOpts) => {if(anonOpts.sdk){return anonOpts.sdk}else{return await SDK(anonOpts)}})(finalOpts)
+  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{return await SDK(finalOpts)}})(finalOpts)
   await app.Hyperdrive('fetch').ready()
   const DEFAULT_TIMEOUT = 10000
   const encodeType = '~'
@@ -66,7 +66,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         const usePath = mid.usePath + info.filename
         data.push(usePath)
         try {
-          push(app.Hyperdrive(main.useHost).write(usePath, Readable.from(fileData)))
+          push(app.Hyperdrive(mid.useHost).write(usePath, Readable.from(fileData)))
         } catch (e) {
           fail(e)
         }
@@ -117,7 +117,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
     }
   }
 
-  const fetch = makeFetch((request) => {
+  const fetch = makeFetch(async (request) => {
 
     const { url, headers: reqHeaders, method, signal, body } = request
 
@@ -265,5 +265,5 @@ module.exports = async function makeHyperFetch (opts = {}) {
     }
   })
 
-  fetch.close = async () => {await sdk.close()}
+  fetch.close = async () => {return await app.close()}
 }
