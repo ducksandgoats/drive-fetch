@@ -1,5 +1,5 @@
 {
-  "name": "drive-fetch",
+  "name": "log-fetch",
   "version": "8.5.0",
   "description": "Implementation of Fetch that uses the Dat SDK for loading p2p content",
   "bin": {
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ducksandgoats/drive-fetch.git"
+    "url": "git+https://github.com/ducksandgoats/log-fetch.git"
   },
   "keywords": [
     "dat",
@@ -20,9 +20,9 @@
   "author": "RangerMauve",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/ducksandgoats/drive-fetch/issues"
+    "url": "https://github.com/ducksandgoats/log-fetch/issues"
   },
-  "homepage": "https://github.com/ducksandgoats/drive-fetch#readme",
+  "homepage": "https://github.com/ducksandgoats/log-fetch#readme",
   "dependencies": {
     "event-iterator": "^2.0.0",
     "fetch-headers": "^2.0.0",
