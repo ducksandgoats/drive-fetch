@@ -3,7 +3,6 @@ const SDK = require('hyper-sdk')
 const parseRange = require('range-parser')
 const { Readable } = require('stream')
 const makeFetch = require('make-fetch')
-const { EventIterator } = require('event-iterator')
 const Busboy = require('busboy')
 const path = require('path')
 
@@ -45,10 +44,11 @@ module.exports = async function makeHyperFetch (opts = {}) {
   }
 
   async function saveData (mid, content, useHeaders, timer) {
-    const data = []
-    const busboy = Busboy({ headers: useHeaders })
+    const {savePath, saveIter} = await new Promise((resolve, reject) => {
+      const savePath = []
+      const saveIter = []
+      const busboy = Busboy({ headers: useHeaders })
 
-    const toUpload = new EventIterator(({ push, stop, fail }) => {
       function handleOff(){
         busboy.off('error', handleError)
         busboy.off('finish', handleFinish)
@@ -56,40 +56,33 @@ module.exports = async function makeHyperFetch (opts = {}) {
       }
       function handleFinish(){
         handleOff()
-        stop()
+        resolve({savePath, saveIter})
       }
       function handleError(error){
         handleOff()
-        fail(error)
+        reject(error)
       }
       function handleFiles(fieldName, fileData, info){
         const usePath = mid.usePath + info.filename
-        data.push(usePath)
-        try {
-          push(app.Hyperdrive(mid.useHost).writeFile(usePath, Readable.from(fileData)))
-        } catch (e) {
-          fail(e)
-        }
+        savePath.push(usePath)
+        saveIter.push(app.Hyperdrive(mid.useHost).writeFile(usePath, Readable.from(fileData)))
       }
       busboy.on('error', handleError)
       busboy.on('finish', handleFinish)
 
       busboy.on('file', handleFiles)
+  
+      // Parse body as a multipart form
+      // TODO: Readable.from doesn't work in browsers
+      Readable.from(content).pipe(busboy)
     })
-
-    // Parse body as a multipart form
-    // TODO: Readable.from doesn't work in browsers
-    Readable.from(content).pipe(busboy)
 
     // toUpload is an async iterator of promises
     // We collect the promises (all files are queued for upload)
     // Then we wait for all of them to resolve
     // await Promise.all(await collect(toUpload))
-    await Promise.race([
-      new Promise((resolve, reject) => setTimeout(() => reject(new Error('timed out while saving data')), timer)),
-      Promise.all(await collect(toUpload))
-    ])
-    return data
+    await Promise.all(saveIter)
+    return savePath
   }
 
   async function iterFiles(data, main){
@@ -110,12 +103,12 @@ module.exports = async function makeHyperFetch (opts = {}) {
     return mimeType
   }
 
-  async function collect (iterable) {
-    const result = []
-    for await (const item of iterable) {
-      result.push(item)
-    }
-  }
+  // async function collect (iterable) {
+  //   const result = []
+  //   for await (const item of iterable) {
+  //     result.push(item)
+  //   }
+  // }
 
   const fetch = makeFetch(async (request) => {
 
@@ -188,7 +181,8 @@ module.exports = async function makeHyperFetch (opts = {}) {
       } else if(method === 'PUT'){
         let mainData = null
         try {
-          mainData = await saveData(main, body, headers, reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT)
+          // mainData = await saveData(main, body, headers, reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT)
+          mainData = await iterFiles(await saveData(main, body, headers, reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT), main)
         } catch (error) {
           if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
             return {statusCode: 400, headers: {'Content-Type': 'text/plain; charset=utf-8', 'X-Issue': error.name}, data: [error.message]}
@@ -198,7 +192,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
             return {statusCode: 400, headers: {'Content-Type': 'application/json; charset=utf-8', 'X-Issue': error.name}, data: [JSON.stringify(error.message)]}
           }
         }
-        mainData = await iterFiles(mainData, main)
+        // mainData = await iterFiles(mainData, main)
         if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
           let useData = ''
           mainData.forEach(data => {
