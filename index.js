@@ -170,12 +170,12 @@ module.exports = async function makeHyperFetch (opts = {}) {
                 if (ranges && ranges.length && ranges.type === 'bytes') {
                   const [{ start, end }] = ranges
                   const length = (end - start + 1)
-                  return {statusCode: 206, headers: {'Content-Type': `${getMimeType(main)}`, 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath, {start, end})}
+                  return {statusCode: 206, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath, {start, end})}
                 } else {
-                  return {statusCode: 200, headers: {'Content-Type': `${getMimeType(main)}`, 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
+                  return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
                 }
               } else {
-                return {statusCode: 200, headers: {'Content-Type': `${getMimeType(main)}`, 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
+                return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
               }
           } else {
             throw new Error('not a directory or file')
