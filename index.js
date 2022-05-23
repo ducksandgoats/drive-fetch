@@ -7,10 +7,10 @@ const { EventIterator } = require('event-iterator')
 const Busboy = require('busboy')
 const path = require('path')
 
-module.exports = function makeHyperFetch (opts = {}) {
+module.exports = async function makeHyperFetch (opts = {}) {
   const DEFAULT_OPTS = {}
   const finalOpts = { ...DEFAULT_OPTS, ...opts }
-  const app = finalOpts.sdk
+  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const sdk = await SDK(finalOpts);await sdk.Hyperdrive('fetch').ready();return sdk;}})(finalOpts)
   // await app.Hyperdrive('fetch').ready()
   const DEFAULT_TIMEOUT = 10000
   const encodeType = '~'
@@ -266,4 +266,6 @@ module.exports = function makeHyperFetch (opts = {}) {
   })
 
   fetch.close = async () => {return await app.close()}
+
+  return fetch
 }
