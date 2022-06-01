@@ -229,7 +229,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         try {
           if(reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')){
             mainData = await saveFormData(main, body, reqHeaders, reqHeaders['x-opt'] ? {...JSON.parse(reqHeaders['x-opt']), timeout: reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT} : {timeout: reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT})
-            mainData = await iterFiles(mainData, timer, main)
+            mainData = await iterFiles(mainData, reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT, main)
           } else {
             await Promise.race([
               new Promise((resolve, reject) => {
