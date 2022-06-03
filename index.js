@@ -17,6 +17,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
   const SUPPORTED_METHODS = ['GET', 'HEAD', 'PUT', 'DELETE']
 
   function formatReq(hostname, pathname){
+
     const useData = {}
     if(hostname === hostType){
       useData.useHost = 'fetch'
@@ -172,7 +173,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         return { statusCode: 409, headers: {}, data: ['something wrong with hostname'] }
       }
 
-      const main = formatReq(mainHostname, pathname)
+      const main = formatReq(decodeURIComponent(mainHostname), decodeURIComponent(pathname))
 
       if(method === 'HEAD'){
         let mainData = null
