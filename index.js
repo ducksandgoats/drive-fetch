@@ -103,14 +103,16 @@ module.exports = async function makeHyperFetch (opts = {}) {
         useData = Array.isArray(useData) ? useData[0] : useData
         useData.pid  = prop
         useData.file = i
-        useData.link = 'hyper://' + useData.pid + useData.file
+        useData.host = 'hyper://' + useData.pid
+        useData.link = useData.host + useData.file
         result.push(useData)
       } catch (error) {
         console.error(typeof(error))
         let useData = {}
         useData.pid  = prop
         useData.file = i
-        useData.link = 'hyper://' + useData.pid + useData.file
+        useData.host = 'hyper://' + useData.pid
+        useData.link = useData.host + useData.file
         result.push(useData)
       }
     }
