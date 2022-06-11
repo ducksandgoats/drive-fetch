@@ -9,8 +9,8 @@ const path = require('path')
 module.exports = async function makeHyperFetch (opts = {}) {
   const DEFAULT_OPTS = {}
   const finalOpts = { ...DEFAULT_OPTS, ...opts }
-  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const sdk = await SDK(finalOpts);await sdk.Hyperdrive('fetch').ready();return sdk;}})(finalOpts)
-  // await app.Hyperdrive('fetch').ready()
+  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const sdk = await SDK(finalOpts);await sdk.Hyperdrive('id').ready();return sdk;}})(finalOpts)
+  // await app.Hyperdrive('id').ready()
   const DEFAULT_TIMEOUT = 30000
   const encodeType = 'hex'
   const hostType = '_'
@@ -20,7 +20,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
     const useData = {}
     if(hostname === hostType){
-      useData.useHost = 'main'
+      useData.useHost = 'id'
     } else {
       useData.useHost = hostname
     }
@@ -208,12 +208,12 @@ module.exports = async function makeHyperFetch (opts = {}) {
               if (ranges && ranges.length && ranges.type === 'bytes') {
                 const [{ start, end }] = ranges
                 const length = (end - start + 1)
-                return {statusCode: 206, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('fetch').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath, {start, end})}
+                return {statusCode: 206, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath, {start, end})}
               } else {
-                return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('fetch').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
+                return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
               }
             } else {
-              return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('fetch').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
+              return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
             }
         } else {
           throw new Error('not a directory or file')
