@@ -20,20 +20,11 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
     const useData = {}
     if(hostname === hostType){
-      useData.useHost = 'fetch'
+      useData.useHost = 'main'
     } else {
       useData.useHost = hostname
     }
-    const pathNameArr = pathname.split('/').filter(Boolean)
-    if(pathNameArr.length){
-      if(pathNameArr[pathNameArr.length - 1].includes('.')){
-        useData.usePath = pathname
-      } else {
-        useData.usePath = pathname + '/'
-      }
-    } else {
-      useData.usePath = pathname
-    }
+    useData.usePath = decodeURIComponent(pathname)
     return useData
   }
 
