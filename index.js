@@ -55,7 +55,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         reject(error)
       }
       function handleFiles(fieldName, fileData, info){
-        const usePath = mid.usePath + info.filename
+        const usePath = path.join(mid.usePath, info.filename).replace(/\\/g, "/")
         savePath.push(usePath)
         saveIter.push(
           Promise.race([
@@ -96,7 +96,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         useData.pid  = prop
         useData.file = i
         useData.host = 'hyper://' + useData.pid
-        useData.link = useData.host + useData.file
+        useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
         result.push(useData)
       } catch (error) {
         console.error(typeof(error))
@@ -104,7 +104,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         useData.pid  = prop
         useData.file = i
         useData.host = 'hyper://' + useData.pid
-        useData.link = useData.host + useData.file
+        useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
         result.push(useData)
       }
     }
@@ -122,14 +122,14 @@ module.exports = async function makeHyperFetch (opts = {}) {
       useData = Array.isArray(useData) ? useData[0] : useData
       useData.pid  = prop
       useData.file = main.usePath
-      useData.link = 'hyper://' + useData.pid + useData.file
+      useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
       result.push(useData)
     } catch (error) {
       console.error(error)
       let useData = {}
       useData.pid  = prop
       useData.file = main.usePath
-      useData.link = 'hyper://' + useData.pid + useData.file
+      useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
       result.push(useData)
     }
     return result
@@ -167,17 +167,34 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const main = formatReq(decodeURIComponent(mainHostname), decodeURIComponent(pathname))
 
       if(method === 'HEAD'){
-        let mainData = null
         try {
-          mainData = await Promise.race([
-            useTimeOut(new Error('this was timed out'), reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
-            app.Hyperdrive(main.useHost).stat(main.usePath)
-          ])
-          mainData = Array.isArray(mainData) ? mainData[0] : mainData
+          if(reqHeaders['x-pin']){
+            if(reqHeaders['x-pin'] === 'add'){
+              const mainData = await Promise.race([
+                useTimeOut(new Error('this was timed out'), reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+                app.Hyperdrive(main.useHost).download('/')
+              ])
+              return {statusCode: 200, headers: {'Link': `<hyper://${mainData.useHost}/>; rel="canonical"`}, data: []}
+            } else if(reqHeaders['x-pin'] === 'sub'){
+              const mainData = await Promise.race([
+                useTimeOut(new Error('this was timed out'), reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+                app.Hyperdrive(main.useHost).rmdir('/', {recursive: true})
+              ])
+              return {statusCode: 200, headers: {'Link': `<hyper://${mainData.useHost}/>; rel="canonical"`}, data: []}
+            } else {
+              throw new Error('X-Pin header is not correct')
+            }
+          } else {
+            const useData = await Promise.race([
+              useTimeOut(new Error('this was timed out'), reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0' ? Number(reqHeaders['x-timer']) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+              app.Hyperdrive(main.useHost).stat(main.usePath)
+            ])
+            const mainData = Array.isArray(useData) ? useData[0] : useData
+            return {statusCode: 200, headers: {'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: []}
+          }
         } catch (error) {
-          return {statusCode: 400, headers: {'X-Issue': error.message}, data: []}
+          return {statusCode: 400, headers: {'X-Issue': error.name}, data: []}
         }
-        return {statusCode: 200, headers: {'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: []}
       } else if(method === 'GET'){
         let mainData = null
         try {
@@ -279,12 +296,12 @@ module.exports = async function makeHyperFetch (opts = {}) {
         }
         mainData.pid = app.Hyperdrive(main.useHost).key
         mainData.path = main.usePath
-        mainData.link = 'hyper://' + mainData.pid + mainData.path
+        mainData.link = `hyper://${path.join(mainData.pid, mainData.path).replace(/\\/g, "/")}`
         if(mainData.isDirectory()){
           const getDir = await app.Hyperdrive(main.useHost).readdir(main.usePath, {recursive: true})
           if(getDir.length){
             for(const i of getDir){
-              await app.Hyperdrive(main.useHost).unlink(main.usePath + i)
+              await app.Hyperdrive(main.useHost).unlink(path.join(main.usePath, i).replace(/\\/g, "/"))
             }
           }
           await app.Hyperdrive(main.useHost).rmdir(main.usePath)
