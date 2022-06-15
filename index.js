@@ -13,7 +13,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
   // await app.Hyperdrive('id').ready()
   const DEFAULT_TIMEOUT = 30000
   const encodeType = 'hex'
-  const hostType = '_'
+  const hostType = '~'
   const SUPPORTED_METHODS = ['GET', 'HEAD', 'PUT', 'DELETE']
 
   function formatReq(hostname, pathname){
