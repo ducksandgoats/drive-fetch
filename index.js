@@ -1,5 +1,4 @@
 const mime = require('mime/lite')
-const SDK = require('hyper-sdk')
 const parseRange = require('range-parser')
 const { Readable } = require('stream')
 const makeFetch = require('make-fetch')
@@ -9,7 +8,7 @@ const path = require('path')
 module.exports = async function makeHyperFetch (opts = {}) {
   const DEFAULT_OPTS = {}
   const finalOpts = { ...DEFAULT_OPTS, ...opts }
-  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const sdk = await SDK(finalOpts);await sdk.Hyperdrive('id').ready();return sdk;}})(finalOpts)
+  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const SDK = require('hyper-sdk');const sdk = await SDK(finalOpts);await sdk.Hyperdrive('id').ready();return sdk;}})(finalOpts)
   // await app.Hyperdrive('id').ready()
   const DEFAULT_TIMEOUT = 30000
   const encodeType = 'hex'
