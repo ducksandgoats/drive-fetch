@@ -27,7 +27,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
     return useData
   }
 
-  function useTimeOut(data, timeout, res, name = null){
+  function makeTimeOut(data, timeout, res, name = null){
     if(name){
       data.name = name
     }
@@ -171,13 +171,13 @@ module.exports = async function makeHyperFetch (opts = {}) {
           if(reqHeaders['x-pin']){
             if(reqHeaders['x-pin'] === 'add'){
               const mainData = await Promise.race([
-                useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
+                makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
                 app.Hyperdrive(main.useHost).download('/')
               ])
               return {statusCode: 200, headers: {'Link': `<hyper://${mainData.useHost}/>; rel="canonical"`}, data: []}
             } else if(reqHeaders['x-pin'] === 'sub'){
               const mainData = await Promise.race([
-                useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
+                makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
                 app.Hyperdrive(main.useHost).rmdir('/', {recursive: true})
               ])
               return {statusCode: 200, headers: {'Link': `<hyper://${mainData.useHost}/>; rel="canonical"`}, data: []}
@@ -186,7 +186,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
             }
           } else {
             const useData = await Promise.race([
-              useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
+              makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
               app.Hyperdrive(main.useHost).stat(main.usePath)
             ])
             const mainData = Array.isArray(useData) ? useData[0] : useData
@@ -199,7 +199,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         let mainData = null
         try {
           mainData = await Promise.race([
-            useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
+            makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
             app.Hyperdrive(main.useHost).stat(main.usePath)
           ])
           mainData = Array.isArray(mainData) ? mainData[0] : mainData
@@ -282,7 +282,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         let mainData = null
         try {
           mainData = await Promise.race([
-            useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
+            makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
             app.Hyperdrive(main.useHost).stat(main.usePath)
           ])
         } catch (error) {
