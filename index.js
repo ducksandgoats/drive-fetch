@@ -164,19 +164,20 @@ module.exports = async function makeHyperFetch (opts = {}) {
       }
 
       const main = formatReq(decodeURIComponent(mainHostname), decodeURIComponent(pathname))
+      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
 
       if(method === 'HEAD'){
         try {
           if(reqHeaders['x-pin']){
             if(reqHeaders['x-pin'] === 'add'){
               const mainData = await Promise.race([
-                useTimeOut(new Error('this was timed out'), (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+                useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
                 app.Hyperdrive(main.useHost).download('/')
               ])
               return {statusCode: 200, headers: {'Link': `<hyper://${mainData.useHost}/>; rel="canonical"`}, data: []}
             } else if(reqHeaders['x-pin'] === 'sub'){
               const mainData = await Promise.race([
-                useTimeOut(new Error('this was timed out'), (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+                useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
                 app.Hyperdrive(main.useHost).rmdir('/', {recursive: true})
               ])
               return {statusCode: 200, headers: {'Link': `<hyper://${mainData.useHost}/>; rel="canonical"`}, data: []}
@@ -185,7 +186,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
             }
           } else {
             const useData = await Promise.race([
-              useTimeOut(new Error('this was timed out'), (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+              useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
               app.Hyperdrive(main.useHost).stat(main.usePath)
             ])
             const mainData = Array.isArray(useData) ? useData[0] : useData
@@ -198,7 +199,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         let mainData = null
         try {
           mainData = await Promise.race([
-            useTimeOut(new Error('this was timed out'), (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+            useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
             app.Hyperdrive(main.useHost).stat(main.usePath)
           ])
           mainData = Array.isArray(mainData) ? mainData[0] : mainData
@@ -238,8 +239,8 @@ module.exports = async function makeHyperFetch (opts = {}) {
         let mainData = null
         try {
           if(reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')){
-            mainData = await saveFormData(main, body, reqHeaders, reqHeaders['x-opt'] || searchParams.has('x-opt') ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}, (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT)
-            mainData = await iterFiles(mainData, (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT, main)
+            mainData = await saveFormData(main, body, reqHeaders, reqHeaders['x-opt'] || searchParams.has('x-opt') ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}, useTimeOut)
+            mainData = await iterFiles(mainData, useTimeOut, main)
           } else {
             await Promise.race([
               new Promise((resolve, reject) => {
@@ -250,9 +251,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
                 destination.once('error', reject)
                 source.once('end', resolve)
               }),
-              new Promise((resolve, reject) => setTimeout(reject, (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT))
+              new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
             ])
-            mainData = await iterFile(main, (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT)
+            mainData = await iterFile(main, useTimeOut)
           }
         } catch (error) {
           if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
@@ -281,7 +282,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         let mainData = null
         try {
           mainData = await Promise.race([
-            useTimeOut(new Error('this was timed out'), (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT, false, 'TimeoutError'),
+            useTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
             app.Hyperdrive(main.useHost).stat(main.usePath)
           ])
         } catch (error) {
