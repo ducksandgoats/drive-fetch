@@ -238,13 +238,13 @@ module.exports = async function makeHyperFetch (opts = {}) {
         let mainData = null
         try {
           if(reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')){
-            mainData = await saveFormData(main, body, reqHeaders, reqHeaders['x-opt'] ? JSON.parse(reqHeaders['x-opt']) : {}, (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT)
+            mainData = await saveFormData(main, body, reqHeaders, reqHeaders['x-opt'] || searchParams.has('x-opt') ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}, (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT)
             mainData = await iterFiles(mainData, (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT, main)
           } else {
             await Promise.race([
               new Promise((resolve, reject) => {
                 const source = Readable.from(body)
-                const destination = app.Hyperdrive(main.useHost).createWriteStream(main.usePath, reqHeaders['x-opt'] ? JSON.parse(reqHeaders['x-opt']) : {})
+                const destination = app.Hyperdrive(main.useHost).createWriteStream(main.usePath, reqHeaders['x-opt'] || searchParams.has('x-opt') ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {})
                 source.pipe(destination)
                 source.once('error', reject)
                 destination.once('error', reject)
