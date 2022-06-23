@@ -216,8 +216,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
             return {statusCode: 200, headers: {'Content-Type': 'application/json; charset=utf-8', 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: [JSON.stringify(mainData)]}
           }
         } else if(mainData.isFile()){
-            if(reqHeaders.Range || reqHeaders.range){
-              const ranges = parseRange(size, isRanged)
+          const isRanged = reqHeaders.Range || reqHeaders.range
+            if(isRanged){
+              const ranges = parseRange(mainData.size, isRanged)
               if (ranges && ranges.length && ranges.type === 'bytes') {
                 const [{ start, end }] = ranges
                 const length = (end - start + 1)
