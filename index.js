@@ -166,6 +166,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const main = formatReq(decodeURIComponent(mainHostname), decodeURIComponent(pathname))
       const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
 
+      const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
+      const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
+
       if(method === 'HEAD'){
         try {
           if(reqHeaders['x-mount'] && reqHeaders['x-mount'] === 'true'){
@@ -200,21 +203,11 @@ module.exports = async function makeHyperFetch (opts = {}) {
           ])
           mainData = Array.isArray(mainData) ? mainData[0] : mainData
         } catch (error) {
-          return {statusCode: 400, headers: {'X-Issue': error.message}, data: [error.stack]}
+          return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.message}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.stack}</div></body></html>`] : [JSON.stringify(error.stack)]}
         }
         if(mainData.isDirectory()){
           mainData = await app.Hyperdrive(main.useHost).readdir(main.usePath)
-          if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
-            let useData = ''
-            mainData.forEach(data => {
-              useData += `${data}\n`
-            })
-            return {statusCode: 200, headers: {'Content-Type': 'text/plain; charset=utf-8', 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: [useData]}
-          } else if(reqHeaders['accept'].includes('text/html')){
-            return {statusCode: 200, headers: {'Content-Type': 'text/html; charset=utf-8', 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`]}
-          } else if(reqHeaders['accept'].includes('application/json')){
-            return {statusCode: 200, headers: {'Content-Type': 'application/json; charset=utf-8', 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: [JSON.stringify(mainData)]}
-          }
+          return {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]}
         } else if(mainData.isFile()){
           const isRanged = reqHeaders.Range || reqHeaders.range
             if(isRanged){
@@ -235,14 +228,15 @@ module.exports = async function makeHyperFetch (opts = {}) {
       } else if(method === 'PUT'){
         let mainData = null
         try {
+          const hasOpt = reqHeaders['x-opt'] || searchParams.has('x-opt')
+          const useOpt = hasOpt ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}
           if(reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')){
-            mainData = await saveFormData(main, body, reqHeaders, reqHeaders['x-opt'] || searchParams.has('x-opt') ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}, useTimeOut)
-            mainData = await iterFiles(mainData, useTimeOut, main)
+            mainData = await iterFiles(await saveFormData(main, body, reqHeaders, useOpt, useTimeOut), useTimeOut, main)
           } else {
             await Promise.race([
               new Promise((resolve, reject) => {
                 const source = Readable.from(body)
-                const destination = app.Hyperdrive(main.useHost).createWriteStream(main.usePath, reqHeaders['x-opt'] || searchParams.has('x-opt') ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {})
+                const destination = app.Hyperdrive(main.useHost).createWriteStream(main.usePath, useOpt)
                 source.pipe(destination)
                 source.once('error', reject)
                 destination.once('error', reject)
@@ -253,28 +247,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
             mainData = await iterFile(main, useTimeOut)
           }
         } catch (error) {
-          if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
-            return {statusCode: 400, headers: {'Content-Type': 'text/plain; charset=utf-8', 'X-Issue': error.name}, data: [error.message]}
-          } else if(reqHeaders['accept'].includes('text/html')){
-            return {statusCode: 400, headers: {'Content-Type': 'text/html; charset=utf-8', 'X-Issue': error.name}, data: [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`]}
-          } else if(reqHeaders['accept'].includes('application/json')){
-            return {statusCode: 400, headers: {'Content-Type': 'application/json; charset=utf-8', 'X-Issue': error.name}, data: [JSON.stringify(error.message)]}
-          }
+          return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`] : [JSON.stringify(error.message)]}
         }
-        if((!reqHeaders['accept']) || (!reqHeaders['accept'].includes('text/html') && !reqHeaders['accept'].includes('application/json'))){
-          let useData = ''
-          mainData.forEach(data => {
-            for(const prop in data){
-              useData += `${prop}: ${data[prop]}\n`
-            }
-            useData += '\n\n\n'
-          })
-          return {statusCode: 200, headers: {'Content-Type': 'text/plain; charset=utf-8'}, data: [useData]}
-        } else if(reqHeaders['accept'].includes('text/html')){
-          return {statusCode: 200, headers: {'Content-Type': 'text/html; charset=utf-8'}, data: [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`]}
-        } else if(reqHeaders['accept'].includes('application/json')){
-          return {statusCode: 200, headers: {'Content-Type': 'application/json; charset=utf-8'}, data: [JSON.stringify(mainData)]}
-        }
+        return {statusCode: 200, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]}
       } else if(method === 'DELETE'){
         let mainData = null
         try {
@@ -283,13 +258,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
             app.Hyperdrive(main.useHost).stat(main.usePath)
           ])
         } catch (error) {
-          if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
-            return {statusCode: 400, headers: {'Content-Type': 'text/plain; charset=utf-8', 'X-Issue': error.name}, data: [error.message]}
-          } else if(reqHeaders['accept'].includes('text/html')){
-            return {statusCode: 400, headers: {'Content-Type': 'text/html; charset=utf-8', 'X-Issue': error.name}, data: [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`]}
-          } else if(reqHeaders['accept'].includes('application/json')){
-            return {statusCode: 400, headers: {'Content-Type': 'application/json; charset=utf-8', 'X-Issue': error.name}, data: [JSON.stringify(error.message)]}
-          }
+          return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`] : [JSON.stringify(error.message)]}
         }
         mainData.pid = app.Hyperdrive(main.useHost).key
         mainData.path = main.usePath
@@ -307,28 +276,14 @@ module.exports = async function makeHyperFetch (opts = {}) {
         } else {
           throw new Error('not a directory or file')
         }
-        if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
-          let useData = ''
-          for(const prop in mainData){
-            useData += `${prop}: ${mainData[prop]}\n`
-          }
-          return {statusCode: 200, headers: {'Content-Type': 'text/plain; charset=utf-8'}, data: [useData]}
-        } else if(reqHeaders['accept'].includes('text/html')){
-          return {statusCode: 200, headers: {'Content-Type': 'text/html; charset=utf-8'}, data: [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`]}
-        } else if(reqHeaders['accept'].includes('application/json')){
-          return {statusCode: 200, headers: {'Content-Type': 'application/json; charset=utf-8'}, data: [JSON.stringify(mainData)]}
-        }
+        return {statusCode: 200, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]}
       } else {
-        return {statusCode: 400, headers: {}, data: ['method is not supported']}
+        return {statusCode: 400, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>method is not supported</div></body></html>`] : [JSON.stringify('method is not supported')]}
       }
     } catch (error) {
-      if(!reqHeaders['accept'] || !reqHeaders['accept'].includes('text/html') || !reqHeaders['accept'].includes('application/json')){
-        return {statusCode: 500, headers: {'Content-Type': 'text/plain; charset=utf-8'}, data: [error.stack]}
-      } else if(reqHeaders['accept'].includes('text/html')){
-        return {statusCode: 500, headers: {'Content-Type': 'text/html; charset=utf-8'}, data: [`<html><head><title>${error.name}</title></head><body><div><p>${error.stack}</p></div></body></html>`]}
-      } else if(reqHeaders['accept'].includes('application/json')){
-        return {statusCode: 500, headers: {'Content-Type': 'application/json; charset=utf-8'}, data: [JSON.stringify(error.stack)]}
-      }
+      const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
+      const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
+      return {statusCode: 500, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>${error.name}</title></head><body><div><p>${error.stack}</p></div></body></html>`] : [JSON.stringify(error.stack)]}
     }
   })
 
