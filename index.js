@@ -95,16 +95,16 @@ module.exports = async function makeHyperFetch (opts = {}) {
         useData.pid  = prop
         useData.file = i
         useData.host = 'hyper://' + useData.pid
-        useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
-        result.push(useData)
-      } catch (error) {
-        console.error(typeof(error))
-        let useData = {}
-        useData.pid  = prop
-        useData.file = i
-        useData.host = 'hyper://' + useData.pid
-        useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
-        result.push(useData)
+        // useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
+        result.push(path.join(useData.host, useData.file).replace(/\\/g, "/"))
+      } catch (err) {
+        console.error(err)
+        // let useData = {}
+        // useData.pid  = prop
+        // useData.file = i
+        // useData.host = 'hyper://' + useData.pid
+        // useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
+        // result.push(useData)
       }
     }
     return result
@@ -121,15 +121,15 @@ module.exports = async function makeHyperFetch (opts = {}) {
       useData = Array.isArray(useData) ? useData[0] : useData
       useData.pid  = prop
       useData.file = main.usePath
-      useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
-      result.push(useData)
-    } catch (error) {
-      console.error(error)
-      let useData = {}
-      useData.pid  = prop
-      useData.file = main.usePath
-      useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
-      result.push(useData)
+      // useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
+      result.push(`hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`)
+    } catch (err) {
+      console.error(err)
+      // let useData = {}
+      // useData.pid  = prop
+      // useData.file = main.usePath
+      // useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
+      // result.push(useData)
     }
     return result
   }
@@ -189,7 +189,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
               app.Hyperdrive(main.useHost).stat(decodeURIComponent(main.usePath))
             ])
             const mainData = Array.isArray(useData) ? useData[0] : useData
-            return {statusCode: 200, headers: {'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: []}
+            return {statusCode: 200, headers: {'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`, 'X-User': main.useHost === 'id' ? app.Hyperdrive(main.useHost).key.toString('hex') : main.useHost}, data: []}
           }
         } catch (error) {
           return {statusCode: 400, headers: {'X-Issue': error.name}, data: []}
