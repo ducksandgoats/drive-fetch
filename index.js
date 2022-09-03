@@ -13,7 +13,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
   const DEFAULT_TIMEOUT = 30000
   const encodeType = 'hex'
   const hostType = '_'
-  const SUPPORTED_METHODS = ['GET', 'HEAD', 'PUT', 'DELETE']
+  const SUPPORTED_METHODS = ['GET', 'HEAD', 'POST', 'DELETE']
 
   function formatReq(hostname, pathname){
 
@@ -95,16 +95,16 @@ module.exports = async function makeHyperFetch (opts = {}) {
         useData.pid  = prop
         useData.file = i
         useData.host = 'hyper://' + useData.pid
-        // useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
-        result.push(path.join(useData.host, useData.file).replace(/\\/g, "/"))
+        useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
+        result.push(useData)
       } catch (err) {
         console.error(err)
-        // let useData = {}
-        // useData.pid  = prop
-        // useData.file = i
+        let useData = {error: err}
+        useData.pid  = prop
+        useData.file = i
         // useData.host = 'hyper://' + useData.pid
         // useData.link = path.join(useData.host, useData.file).replace(/\\/g, "/")
-        // result.push(useData)
+        result.push(useData)
       }
     }
     return result
@@ -121,15 +121,15 @@ module.exports = async function makeHyperFetch (opts = {}) {
       useData = Array.isArray(useData) ? useData[0] : useData
       useData.pid  = prop
       useData.file = main.usePath
-      // useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
-      result.push(`hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`)
+      useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
+      result.push(useData)
     } catch (err) {
       console.error(err)
-      // let useData = {}
-      // useData.pid  = prop
-      // useData.file = main.usePath
+      let useData = {error: err}
+      useData.pid  = prop
+      useData.file = main.usePath
       // useData.link = `hyper://${path.join(useData.pid, useData.file).replace(/\\/g, "/")}`
-      // result.push(useData)
+      result.push(useData)
     }
     return result
   }
@@ -225,7 +225,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         } else {
           throw new Error('not a directory or file')
         }
-      } else if(method === 'PUT'){
+      } else if(method === 'POST'){
         let mainData = null
         try {
           const hasOpt = reqHeaders['x-opt'] || searchParams.has('x-opt')
