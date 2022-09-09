@@ -261,6 +261,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
           return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`] : [JSON.stringify(error.message)]}
         }
         mainData.pid = app.Hyperdrive(main.useHost).key
+        mainData.id = mainData.pid
         mainData.path = main.usePath
         mainData.link = `hyper://${path.join(mainData.pid, mainData.path).replace(/\\/g, "/")}`
         if(mainData.isDirectory()){
