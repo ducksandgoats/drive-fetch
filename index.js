@@ -78,7 +78,10 @@ module.exports = async function makeHyperFetch (opts = {}) {
       Readable.from(content).pipe(busboy)
     })
 
-    await Promise.all(saveIter)
+    // await Promise.all(saveIter)
+    for(const test of saveIter){
+      await test
+    }
     return savePath
   }
 
@@ -260,6 +263,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         } catch (error) {
           return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`] : [JSON.stringify(error.message)]}
         }
+        mainData = Array.isArray(mainData) ? mainData[0] : mainData
         mainData.pid = app.Hyperdrive(main.useHost).key.toString('hex')
         mainData.id = mainData.pid
         mainData.path = main.usePath
