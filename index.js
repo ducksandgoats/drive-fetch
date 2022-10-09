@@ -174,18 +174,20 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
       if(method === 'HEAD'){
         try {
-          if(reqHeaders['x-mount'] && reqHeaders['x-mount'] === 'true'){
-            const mainData = await Promise.race([
-              makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
-              app.Hyperdrive('id').mount(decodeURIComponent(main.usePath), main.useHost)
-            ])
-            return {statusCode: 200, headers: {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []}
-          } else if(reqHeaders['x-unmount'] && reqHeaders['x-unmount'] === 'true'){
-            const mainData = await Promise.race([
-              makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
-              app.Hyperdrive('id').unmount(decodeURIComponent(main.usePath))
-            ])
-            return {statusCode: 200, headers: {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []}
+          if(reqHeaders['x-mount']){
+            if(JSON.parse(reqHeaders['x-mount'])){
+              const mainData = await Promise.race([
+                makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
+                app.Hyperdrive('id').mount(decodeURIComponent(main.usePath), main.useHost)
+              ])
+              return {statusCode: 200, headers: {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []}
+            } else {
+              const mainData = await Promise.race([
+                makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
+                app.Hyperdrive('id').unmount(decodeURIComponent(main.usePath))
+              ])
+              return {statusCode: 200, headers: {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []}
+            }
           } else {
             const useData = await Promise.race([
               makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
