@@ -15,6 +15,11 @@ module.exports = async function makeHyperFetch (opts = {}) {
   const hostType = '_'
   const SUPPORTED_METHODS = ['GET', 'HEAD', 'POST', 'DELETE']
 
+  function takeCareOfIt(data){
+    console.log(data)
+    throw new Error('aborted')
+  }
+
   function formatReq(hostname, pathname){
 
     const useData = {}
@@ -154,16 +159,37 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
     const { url, headers: reqHeaders, method, signal, body } = request
 
+    if(signal){
+      signal.addEventListener('abort', takeCareOfIt)
+    }
+
     try {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
       const mainHostname = hostname && hostname.startsWith(encodeType) ? Buffer.from(hostname.slice(encodeType.length), 'hex').toString('utf-8') : hostname
 
+      let isItBad = false
+      const badObj = {}
       if (protocol !== 'hyper:') {
-        return { statusCode: 409, headers: {}, data: ['wrong protocol'] }
+        isItBad = true
+        badObj.statusCode = 409
+        badObj.headers = {}
+        badObj.data = ['wrong protocol'] 
       } else if (!method || !SUPPORTED_METHODS.includes(method)) {
-        return { statusCode: 409, headers: {}, data: ['something wrong with method'] }
+        isItBad = true
+        badObj.statusCode = 409
+        badObj.headers = {}
+        badObj.data = ['something wrong with method'] 
       } else if (!mainHostname) {
-        return { statusCode: 409, headers: {}, data: ['something wrong with hostname'] }
+        isItBad = true
+        badObj.statusCode = 409
+        badObj.headers = {}
+        badObj.data = ['something wrong with hostname'] 
+      }
+      if(isItBad){
+        if(signal){
+          signal.removeEventListener('abort', takeCareOfIt)
+        }
+        return badObj
       }
 
       const main = formatReq(decodeURIComponent(mainHostname), decodeURIComponent(pathname))
@@ -173,6 +199,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
 
       if(method === 'HEAD'){
+        const mainObj = {}
         try {
           if(reqHeaders['x-mount']){
             if(JSON.parse(reqHeaders['x-mount'])){
@@ -180,13 +207,19 @@ module.exports = async function makeHyperFetch (opts = {}) {
                 makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
                 app.Hyperdrive('id').mount(decodeURIComponent(main.usePath), main.useHost)
               ])
-              return {statusCode: 200, headers: {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []}
+
+              mainObj.statusCode = 200
+              mainObj.headers = {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}
+              mainObj.data = []
             } else {
               const mainData = await Promise.race([
                 makeTimeOut(new Error('this was timed out'), useTimeOut, false, 'TimeoutError'),
                 app.Hyperdrive('id').unmount(decodeURIComponent(main.usePath))
               ])
-              return {statusCode: 200, headers: {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []}
+
+              mainObj.statusCode = 200
+              mainObj.headers = {'X-Data': `${JSON.stringify(mainData)}`, 'Link': `<hyper://${app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`}
+              mainObj.data = []
             }
           } else {
             const useData = await Promise.race([
@@ -194,12 +227,23 @@ module.exports = async function makeHyperFetch (opts = {}) {
               app.Hyperdrive(main.useHost).stat(decodeURIComponent(main.usePath))
             ])
             const mainData = Array.isArray(useData) ? useData[0] : useData
-            return {statusCode: 200, headers: {'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`, 'X-User': main.useHost === 'id' ? app.Hyperdrive(main.useHost).key.toString('hex') : main.useHost}, data: []}
+
+            mainObj.statusCode = 200
+            mainObj.headers = {'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`, 'X-User': main.useHost === 'id' ? app.Hyperdrive(main.useHost).key.toString('hex') : main.useHost}
+            mainObj.data = []
           }
         } catch (error) {
-          return {statusCode: 400, headers: {'X-Issue': error.name}, data: []}
+          mainObj.statusCode = 400
+          mainObj.headers = {'X-Issue': error.name}
+          mainObj.data = []
         }
+
+        if(signal){
+          signal.removeEventListener('abort', takeCareOfIt)
+        }
+        return mainObj
       } else if(method === 'GET'){
+        const mainObj = {}
         let mainData = null
         try {
           mainData = await Promise.race([
@@ -208,11 +252,17 @@ module.exports = async function makeHyperFetch (opts = {}) {
           ])
           mainData = Array.isArray(mainData) ? mainData[0] : mainData
         } catch (error) {
+          if(signal){
+            signal.removeEventListener('abort', takeCareOfIt)
+          }
           return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.message}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.stack}</div></body></html>`] : [JSON.stringify(error.stack)]}
         }
         if(mainData.isDirectory()){
           mainData = await app.Hyperdrive(main.useHost).readdir(main.usePath)
-          return {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]}
+
+          mainObj.statusCode = 200
+          mainObj.headers = {'Content-Type': mainRes, 'Link': `<hyper://${main.useHost}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}
+          mainObj.data = mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]
         } else if(mainData.isFile()){
           const isRanged = reqHeaders.Range || reqHeaders.range
             if(isRanged){
@@ -220,16 +270,28 @@ module.exports = async function makeHyperFetch (opts = {}) {
               if (ranges && ranges.length && ranges.type === 'bytes') {
                 const [{ start, end }] = ranges
                 const length = (end - start + 1)
-                return {statusCode: 206, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath, {start, end})}
+
+                mainObj.statusCode = 206
+                mainObj.headers = {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${mainData.size}`}
+                mainObj.data = app.Hyperdrive(main.useHost).createReadStream(main.usePath, {start, end})
               } else {
-                return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
+                mainObj.statusCode = 200
+                mainObj.headers = {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}
+                mainObj.data = app.Hyperdrive(main.useHost).createReadStream(main.usePath)
               }
             } else {
-              return {statusCode: 200, headers: {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}, data: app.Hyperdrive(main.useHost).createReadStream(main.usePath)}
+              mainObj.statusCode = 200
+              mainObj.headers = {'Content-Type': getMimeType(main.usePath), 'Link': `<hyper://${main.useHost !== hostType ? main.useHost : app.Hyperdrive('id').key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${mainData.size}`}
+              mainObj.data = app.Hyperdrive(main.useHost).createReadStream(main.usePath)
             }
         } else {
           throw new Error('not a directory or file')
         }
+
+        if(signal){
+          signal.removeEventListener('abort', takeCareOfIt)
+        }
+        return mainObj
       } else if(method === 'POST'){
         let mainData = null
         try {
@@ -252,7 +314,14 @@ module.exports = async function makeHyperFetch (opts = {}) {
             mainData = await iterFile(main, useTimeOut)
           }
         } catch (error) {
+          if(signal){
+            signal.removeEventListener('abort', takeCareOfIt)
+          }
           return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`] : [JSON.stringify(error.message)]}
+        }
+
+        if(signal){
+          signal.removeEventListener('abort', takeCareOfIt)
         }
         return {statusCode: 200, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]}
       } else if(method === 'DELETE'){
@@ -263,6 +332,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
             app.Hyperdrive(main.useHost).stat(main.usePath)
           ])
         } catch (error) {
+          if(signal){
+            signal.removeEventListener('abort', takeCareOfIt)
+          }
           return {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${error.message}</div></body></html>`] : [JSON.stringify(error.message)]}
         }
         mainData = Array.isArray(mainData) ? mainData[0] : mainData
@@ -283,11 +355,20 @@ module.exports = async function makeHyperFetch (opts = {}) {
         } else {
           throw new Error('not a directory or file')
         }
+        if(signal){
+          signal.removeEventListener('abort', takeCareOfIt)
+        }
         return {statusCode: 200, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]}
       } else {
+        if(signal){
+          signal.removeEventListener('abort', takeCareOfIt)
+        }
         return {statusCode: 400, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>method is not supported</div></body></html>`] : [JSON.stringify('method is not supported')]}
       }
     } catch (error) {
+      if(signal){
+        signal.removeEventListener('abort', takeCareOfIt)
+      }
       const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
       return {statusCode: 500, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>${error.name}</title></head><body><div><p>${error.stack}</p></div></body></html>`] : [JSON.stringify(error.stack)]}
