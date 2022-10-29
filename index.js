@@ -1,8 +1,8 @@
 module.exports = async function makeHyperFetch (opts = {}) {
-  const mime = await import('mime/lite')
+  const makeFetch = (await import('make-fetch')).makeFetch
+  const mime = require('mime/lite')
   const parseRange = require('range-parser')
   const { Readable } = require('stream')
-  const makeFetch = require('make-fetch')
   const Busboy = require('busboy')
   const path = require('path')
 
