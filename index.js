@@ -11,7 +11,6 @@ module.exports = async function makeHyperFetch (opts = {}) {
   const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const SDK = require('hyper-sdk');const sdk = await SDK(finalOpts);await sdk.Hyperdrive('id').ready();return sdk;}})(finalOpts)
   // await app.Hyperdrive('id').ready()
   const DEFAULT_TIMEOUT = 30000
-  const encodeType = 'hex'
   const hostType = '_'
   const SUPPORTED_METHODS = ['GET', 'HEAD', 'POST', 'DELETE']
 
@@ -172,17 +171,16 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
     try {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
-      const mainHostname = hostname && hostname.startsWith(encodeType) ? Buffer.from(hostname.slice(encodeType.length), 'hex').toString('utf-8') : hostname
 
       if (protocol !== 'hyper:') {
         return sendTheData(signal, {statusCode: 409, headers: {}, data: ['wrong protocol'] })
       } else if (!method || !SUPPORTED_METHODS.includes(method)) {
         return sendTheData(signal, {statusCode: 409, headers: {}, data: ['something wrong with method'] })
-      } else if (!mainHostname) {
+      } else if ((!hostname) || (hostname.length === 1 && hostname !== hostType)) {
         return sendTheData(signal, {statusCode: 409, headers: {}, data: ['something wrong with hostname'] })
       }
 
-      const main = formatReq(decodeURIComponent(mainHostname), decodeURIComponent(pathname))
+      const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
       const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
 
       const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
