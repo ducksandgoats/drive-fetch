@@ -1,6 +1,6 @@
 {
   "name": "log-fetch",
-  "version": "20.0.4",
+  "version": "20.0.5",
   "description": "Implementation of Fetch that uses the Dat SDK for loading p2p content",
   "bin": {
     "hypercore-fetch": "bin.js"
@@ -26,7 +26,7 @@
   "dependencies": {
     "busboy": "^1.6.0",
     "hyper-sdk": "^3.0.9",
-    "make-fetch": "^3.0.0",
+    "make-fetch": "^2.3.4",
     "mime": "^2.4.4",
     "range-parser": "^1.2.1"
   },
