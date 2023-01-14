@@ -8,7 +8,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
   const DEFAULT_OPTS = {}
   const finalOpts = { ...DEFAULT_OPTS, ...opts }
-  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const SDK = require('hyper-sdk').default;const sdk = await SDK(finalOpts);await sdk.Hyperdrive('id').ready();return sdk;}})(finalOpts)
+  const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const SDK = require('hyper-sdk');const sdk = await SDK.default(finalOpts);await sdk.Hyperdrive('id').ready();return sdk;}})(finalOpts)
   // await app.Hyperdrive('id').ready()
   const DEFAULT_TIMEOUT = 30000
   const hostType = '_'
