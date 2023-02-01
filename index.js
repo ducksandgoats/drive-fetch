@@ -218,9 +218,13 @@ module.exports = async function makeHyperFetch (opts = {}) {
             new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
           ])
           if(useData){
-            return sendTheData(signal, {statusCode: 200, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`}, data: []})
+            return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`}, data: []})
           } else {
-            return sendTheData(signal, {statusCode: 400, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []})
+            let useNum = 0
+            for await (const test of useDrive.list(main.usePath)){
+              useNum = useNum + test.value.blob.byteLength
+            }
+            return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useNum}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []})
           }
         } catch (error) {
           return sendTheData(signal, {statusCode: 400, headers: {'X-Issue': error.name}, data: []})
@@ -235,13 +239,14 @@ module.exports = async function makeHyperFetch (opts = {}) {
       if(useData){
         const isRanged = reqHeaders.Range || reqHeaders.range
         if(isRanged){
-          const ranges = parseRange(mainData.size, isRanged)
-          if (ranges && ranges.length && ranges.type === 'bytes') {
+          const ranges = parseRange(useData.value.blob.byteLength, isRanged)
+          // if (ranges && ranges.length && ranges.type === 'bytes') {
+          if ((ranges !== -1 && ranges !== -2) && ranges.type === 'bytes') {
             const [{ start, end }] = ranges
             const length = (end - start + 1)
             return sendTheData(signal, {statusCode: 206, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${useData.value.blob.byteLength}`}, data: useDrive.createReadStream(useData.key, {start, end})})
           } else {
-            return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: useDrive.createReadStream(useData.key)})
+            return sendTheData(signal, {statusCode: 400, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: mainReq ? ['<html><head><title>range</title></head><body><div><p>malformed or unsatisfiable range</p></div></body></html>'] : [JSON.stringify('malformed or unsatisfiable range')]})
           }
         } else {
           return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: useDrive.createReadStream(useData.key)})
