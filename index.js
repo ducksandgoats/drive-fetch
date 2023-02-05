@@ -208,9 +208,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
           const pathToFile = JSON.parse(reqHeaders['x-load']) ? path.join(`/${useDrive.key.toString('hex')}`, useData.key).replace(/\\/g, "/") : useData.key
             const mainDrive = await checkForDrive(id)
             mainDrive.put(pathToFile, await useDrive.get(useData.key))
-          return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${mainDrive.key.toString('hex')}${pathToFile}>; rel="canonical"`}, data: []})
+          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${mainDrive.key.toString('hex')}${pathToFile}>; rel="canonical"`}, body: []})
         } else {
-          return sendTheData(signal, {statusCode: 400, headers: {}, data: []})
+          return sendTheData(signal, {status: 400, headers: {}, body: []})
         }
       } else {
         const useDrive = await checkForDrive(main.useHost)
@@ -219,13 +219,13 @@ module.exports = async function makeHyperFetch (opts = {}) {
           new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
         ])
         if(useData){
-          return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`}, data: []})
+          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`}, body: []})
         } else {
           let useNum = 0
           for await (const test of useDrive.list(main.usePath)){
             useNum = useNum + test.value.blob.byteLength
           }
-          return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useNum}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []})
+          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useNum}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, body: []})
         }
       }
   }
@@ -258,12 +258,12 @@ module.exports = async function makeHyperFetch (opts = {}) {
           if ((ranges !== -1 && ranges !== -2) && ranges.type === 'bytes') {
             const [{ start, end }] = ranges
             const length = (end - start + 1)
-            return sendTheData(signal, {statusCode: 206, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${useData.value.blob.byteLength}`}, data: useDrive.createReadStream(useData.key, {start, end})})
+            return sendTheData(signal, {status: 206, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${useData.value.blob.byteLength}`}, body: useDrive.createReadStream(useData.key, {start, end})})
           } else {
-            return sendTheData(signal, {statusCode: 400, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: mainReq ? ['<html><head><title>range</title></head><body><div><p>malformed or unsatisfiable range</p></div></body></html>'] : [JSON.stringify('malformed or unsatisfiable range')]})
+            return sendTheData(signal, {status: 400, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: mainReq ? ['<html><head><title>range</title></head><body><div><p>malformed or unsatisfiable range</p></div></body></html>'] : [JSON.stringify('malformed or unsatisfiable range')]})
           }
         } else {
-          return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: useDrive.createReadStream(useData.key)})
+          return sendTheData(signal, {status: 200, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: useDrive.createReadStream(useData.key)})
         }
       } else {
         const arr = []
@@ -277,7 +277,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
             arr.push({key: fold.replace(/\\/g, "/"), type: 'folder'})
           }
         }
-        return sendTheData(signal, {statusCode: 200, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(arr)}</div></body></html>`] : [JSON.stringify(arr)]})
+        return sendTheData(signal, {status: 200, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(arr)}</div></body></html>`] : [JSON.stringify(arr)]})
       }
   }
 
@@ -306,7 +306,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
           return await iterFile(useDrive, await saveFileData(useDrive, main, body, useOpt, useTimeOut), main, useTimeOut)
         }
       })()
-      return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]})
+      return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]})
   }
 
   async function handleDelete(request) {
@@ -331,7 +331,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
       ])
       if(useData){
         await useDrive.del(useData.key)
-        return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useData}</div></body></html>`] : [JSON.stringify(useData)]})
+        return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useData}</div></body></html>`] : [JSON.stringify(useData)]})
       } else {
         const useArr = []
         let useNum = 0
@@ -340,7 +340,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
           await useDrive.del(test.key)
           useArr.push(test)
         }
-        return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${useNum}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useArr}</div></body></html>`] : [JSON.stringify(useArr)]})
+        return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${useNum}`}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useArr}</div></body></html>`] : [JSON.stringify(useArr)]})
       }
   }
 
