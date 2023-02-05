@@ -1,5 +1,6 @@
 module.exports = async function makeHyperFetch (opts = {}) {
-  const {makeFetch} = await import('make-fetch')
+  const { makeRoutedFetch } = await import('make-fetch')
+  const {fetch, router} = makeRoutedFetch()
   const mime = require('mime/lite')
   const parseRange = require('range-parser')
   const { Readable } = require('stream')
@@ -185,52 +186,65 @@ module.exports = async function makeHyperFetch (opts = {}) {
   //   }
   // }
 
-  const fetch = makeFetch(async (request) => {
-
+  async function handleHead(request) {
     const { url, headers: reqHeaders, method, signal, body } = request
 
     if(signal){
       signal.addEventListener('abort', takeCareOfIt)
     }
 
-    try {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
-      if (protocol !== 'hyper:') {
-        return sendTheData(signal, {statusCode: 409, headers: {}, data: ['wrong protocol'] })
-      } else if (!method || !SUPPORTED_METHODS.includes(method)) {
-        return sendTheData(signal, {statusCode: 409, headers: {}, data: ['something wrong with method'] })
-      } else if (hostname.length !== 64 || hostname !== hostType) {
-        return sendTheData(signal, {statusCode: 409, headers: {}, data: ['something wrong with hostname'] })
+      const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
+      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
+    
+      if (reqHeaders['x-load']) {
+        const useDrive = await checkForDrive(main.useHost)
+        const useData = await Promise.race([
+          useDrive.entry(main.usePath),
+          new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
+        ])
+        if (useData) {
+          const pathToFile = JSON.parse(reqHeaders['x-load']) ? path.join(`/${useDrive.key.toString('hex')}`, useData.key).replace(/\\/g, "/") : useData.key
+            const mainDrive = await checkForDrive(id)
+            mainDrive.put(pathToFile, await useDrive.get(useData.key))
+          return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${mainDrive.key.toString('hex')}${pathToFile}>; rel="canonical"`}, data: []})
+        } else {
+          return sendTheData(signal, {statusCode: 400, headers: {}, data: []})
+        }
+      } else {
+        const useDrive = await checkForDrive(main.useHost)
+        const useData = await Promise.race([
+          useDrive.entry(main.usePath),
+          new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
+        ])
+        if(useData){
+          return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`}, data: []})
+        } else {
+          let useNum = 0
+          for await (const test of useDrive.list(main.usePath)){
+            useNum = useNum + test.value.blob.byteLength
+          }
+          return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useNum}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []})
+        }
       }
+  }
+
+  async function handleGet(request) {
+    const { url, headers: reqHeaders, method, signal, body } = request
+
+    if(signal){
+      signal.addEventListener('abort', takeCareOfIt)
+    }
+
+      const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
       const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
       const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
 
       const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-
-      if(method === 'HEAD'){
-        try {
-          const useDrive = await checkForDrive(main.useHost)
-          const useData = await Promise.race([
-            useDrive.entry(main.usePath),
-            new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
-          ])
-          if(useData){
-            return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`}, data: []})
-          } else {
-            let useNum = 0
-            for await (const test of useDrive.list(main.usePath)){
-              useNum = useNum + test.value.blob.byteLength
-            }
-            return sendTheData(signal, {statusCode: 200, headers: {'Content-Length': `${useNum}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, data: []})
-          }
-        } catch (error) {
-          return sendTheData(signal, {statusCode: 400, headers: {'X-Issue': error.name}, data: []})
-        }
-      } else if(method === 'GET'){
-    try {
+    
       const useDrive = await checkForDrive(main.useHost)
       const useData = await Promise.race([
         useDrive.entry(main.usePath),
@@ -265,57 +279,75 @@ module.exports = async function makeHyperFetch (opts = {}) {
         }
         return sendTheData(signal, {statusCode: 200, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(arr)}</div></body></html>`] : [JSON.stringify(arr)]})
       }
-    } catch (error) {
-      return sendTheData(signal, {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>${error.name}</title></head><body><div><p>${error.name}</p></div></body></html>`] : [JSON.stringify(error.name)]})
+  }
+
+  async function handlePost(request) {
+    const { url, headers: reqHeaders, method, signal, body } = request
+
+    if(signal){
+      signal.addEventListener('abort', takeCareOfIt)
     }
-      } else if(method === 'POST'){
-        try {
-          const useDrive = await checkForDrive(main.useHost)
-          const hasOpt = reqHeaders['x-opt'] || searchParams.has('x-opt')
-          const useOpt = hasOpt ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}
-          const mainData = await (async () => {
-            if(reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')){
-              return await iterFiles(useDrive, await saveFormData(useDrive, main, body, reqHeaders, useOpt, useTimeOut), useTimeOut, main)
-            } else {
-              return await iterFile(useDrive, await saveFileData(useDrive, main, body, useOpt, useTimeOut), main, useTimeOut)
-            }
-          })()
-          return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]})
-        } catch (error) {
-          return sendTheData(signal, {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>${error.name}</title></head><body><div><p>${error.name}</p></div></body></html>`] : [JSON.stringify(error.name)]})
-        }
-      } else if(method === 'DELETE'){
-        try {
-          const useDrive = await checkForDrive(main.useHost)
-          const useData = await Promise.race([
-            useDrive.entry(main.usePath),
-            new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
-          ])
-          if(useData){
-            await useDrive.del(useData.key)
-            return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useData}</div></body></html>`] : [JSON.stringify(useData)]})
-          } else {
-            const useArr = []
-            let useNum = 0
-            for await (const test of useDrive.list(main.usePath)){
-              useNum = useNum + test.value.blob.byteLength
-              await useDrive.del(test.key)
-              useArr.push(test)
-            }
-            return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${useNum}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useArr}</div></body></html>`] : [JSON.stringify(useArr)]})
-          }
-        } catch (error) {
-          return sendTheData(signal, {statusCode: 400, headers: {'Content-Type': mainRes, 'X-Issue': error.name}, data: mainReq ? [`<html><head><title>${error.name}</title></head><body><div><p>${error.name}</p></div></body></html>`] : [JSON.stringify(error.name)]})
-        }
-      } else {
-        return sendTheData(signal, {statusCode: 400, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>method is not supported</div></body></html>`] : [JSON.stringify('method is not supported')]})
-      }
-    } catch (error) {
+
+      const { hostname, pathname, protocol, search, searchParams } = new URL(url)
+
+      const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
+      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
+
       const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-      return sendTheData(signal, {statusCode: 500, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>${error.name}</title></head><body><div><p>${error.stack}</p></div></body></html>`] : [JSON.stringify(error.stack)]})
+    
+      const useDrive = await checkForDrive(main.useHost)
+      const hasOpt = reqHeaders['x-opt'] || searchParams.has('x-opt')
+      const useOpt = hasOpt ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}
+      const mainData = await (async () => {
+        if(reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')){
+          return await iterFiles(useDrive, await saveFormData(useDrive, main, body, reqHeaders, useOpt, useTimeOut), useTimeOut, main)
+        } else {
+          return await iterFile(useDrive, await saveFileData(useDrive, main, body, useOpt, useTimeOut), main, useTimeOut)
+        }
+      })()
+      return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]})
+  }
+
+  async function handleDelete(request) {
+    const { url, headers: reqHeaders, method, signal, body } = request
+
+    if(signal){
+      signal.addEventListener('abort', takeCareOfIt)
     }
-  })
+
+      const { hostname, pathname, protocol, search, searchParams } = new URL(url)
+
+      const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
+      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
+
+      const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
+      const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
+    
+      const useDrive = await checkForDrive(main.useHost)
+      const useData = await Promise.race([
+        useDrive.entry(main.usePath),
+        new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
+      ])
+      if(useData){
+        await useDrive.del(useData.key)
+        return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useData}</div></body></html>`] : [JSON.stringify(useData)]})
+      } else {
+        const useArr = []
+        let useNum = 0
+        for await (const test of useDrive.list(main.usePath)){
+          useNum = useNum + test.value.blob.byteLength
+          await useDrive.del(test.key)
+          useArr.push(test)
+        }
+        return sendTheData(signal, {statusCode: 200, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Length': `${useNum}`}, data: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${useArr}</div></body></html>`] : [JSON.stringify(useArr)]})
+      }
+  }
+
+  router.head('hyper://*/**', handleHead)
+  router.get('hyper://*/**', handleGet)
+  router.post('hyper://*/**', handlePost)
+  router.delete('hyper://*/**', handleDelete)
 
   fetch.close = async () => {return await app.close()}
 
