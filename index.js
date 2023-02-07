@@ -277,7 +277,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
             arr.push({key: fold.replace(/\\/g, "/"), type: 'folder'})
           }
         }
-        return sendTheData(signal, {status: 200, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(arr)}</div></body></html>`] : [JSON.stringify(arr)]})
+        return sendTheData(signal, {status: 200, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${arr.length ? arr.map((data) => {return `<p><a href="hyper://${useDrive.key.toString('hex')}/${data}">${data}</a></p>`}) : '<p>there is no data</p>'}</div></body></html>`] : [JSON.stringify(arr)]})
       }
   }
 
