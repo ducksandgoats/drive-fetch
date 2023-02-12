@@ -3,8 +3,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
   const {fetch, router} = makeRoutedFetch()
   const mime = require('mime/lite')
   const parseRange = require('range-parser')
-  const { Readable } = require('stream')
-  const Busboy = require('busboy')
+  const { Readable, pipelinePromise } = require('streamx')
   const path = require('path')
 
   const DEFAULT_OPTS = {}
@@ -12,7 +11,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
   const app = await (async (finalOpts) => {if(finalOpts.sdk){return finalOpts.sdk}else{const SDK = await import('hyper-sdk');const sdk = await SDK.create(finalOpts);return sdk;}})(finalOpts)
   const DEFAULT_TIMEOUT = 30000
   const hostType = '_'
-  const SUPPORTED_METHODS = ['GET', 'HEAD', 'POST', 'DELETE']
+  // const SUPPORTED_METHODS = ['GET', 'HEAD', 'POST', 'DELETE']
 
   const drives = new Map()
   const id = await (async () => {
@@ -43,6 +42,16 @@ module.exports = async function makeHyperFetch (opts = {}) {
     return theData
   }
 
+  function handleFormData(formdata){
+    const arr = []
+    for (const [name, info] of formdata) {
+      if (name === 'file') {
+        arr.push(info)
+      }
+    }
+    return arr
+  }
+
   function formatReq(hostname, pathname){
 
     const useData = {}
@@ -62,74 +71,29 @@ module.exports = async function makeHyperFetch (opts = {}) {
   //   return new Promise((resolve, reject) => {setTimeout(() => {if(res){resolve(data)}else{reject(data)}}, timeout)})
   // }
 
-  async function saveFileData(drive, main, body, useOpt, useTimeOut){
-    return await Promise.race([
-      new Promise((resolve, reject) => {
-        const source = Readable.from(body)
-        const destination = drive.createWriteStream(main.usePath, useOpt)
-        source.pipe(destination)
-        source.once('error', reject)
-        destination.once('error', reject)
-        source.once('close', () => {
-          console.log('close')
-        })
-        destination.once('close', () => {
-          resolve({})
-        })
-      }),
-      new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
+  async function saveFileData(drive, main, body, useOpt, sec) {
+    await Promise.race([
+      pipelinePromise(Readable.from(body), drive.createWriteStream(main.usePath, useOpts)),
+      new Promise((resolve, reject) => setTimeout(reject, sec))
     ])
+    return [main.usePath]
   }
 
-  async function saveFormData(drive, mid, content, useHeaders, useOpts, timeout) {
-    const {savePath, saveIter} = await new Promise((resolve, reject) => {
-      const savePath = []
-      const saveIter = []
-      const busboy = Busboy({ headers: useHeaders })
-
-      function handleOff(){
-        busboy.off('error', handleError)
-        busboy.off('finish', handleFinish)
-        busboy.off('file', handleFiles)
-      }
-      function handleFinish(){
-        handleOff()
-        resolve({savePath, saveIter})
-      }
-      function handleError(error){
-        handleOff()
-        reject(error)
-      }
-      function handleFiles(fieldName, fileData, info){
-        const usePath = path.join(mid.usePath, info.filename).replace(/\\/g, "/")
-        savePath.push(usePath)
-        saveIter.push(
+  async function saveFormData(drive, mid, data, useOpts, sec) {
+    const saved = []
+    const iter = []
+    for (const info of data) {
+        const usePath = path.join(mid.usePath, info.name).replace(/\\/g, "/")
+        saved.push(usePath)
+        iter.push(
           Promise.race([
-            new Promise((resolve, reject) => {
-              const source = Readable.from(fileData)
-              const destination = drive.createWriteStream(usePath, useOpts)
-              source.pipe(destination)
-              source.once('error', reject)
-              destination.once('error', reject)
-              source.once('end', resolve)
-            }),
-            new Promise((resolve, reject) => setTimeout(reject, timeout))
+            pipelinePromise(Readable.from(info.stream()), drive.createWriteStream(usePath, useOpts)),
+            new Promise((resolve, reject) => setTimeout(reject, sec))
           ])
         )
-      }
-      busboy.on('error', handleError)
-      busboy.on('finish', handleFinish)
-
-      busboy.on('file', handleFiles)
-  
-      Readable.from(content).pipe(busboy)
-    })
-
-    // await Promise.all(saveIter)
-    for(const test of saveIter){
-      await test
     }
-    return savePath
+    await Promise.all(iter)
+    return saved
   }
 
   async function iterFiles(drive, data, timer, main){
@@ -196,21 +160,21 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
       const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
-      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
+      const useTimeOut = (reqHeaders.has('x-timer') && reqHeaders.get('x-timer') !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
     
-      if (reqHeaders['x-load']) {
+      if (reqHeaders.has('x-copy')) {
         const useDrive = await checkForDrive(main.useHost)
         const useData = await Promise.race([
           useDrive.entry(main.usePath),
           new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
         ])
         if (useData) {
-          const pathToFile = JSON.parse(reqHeaders['x-load']) ? path.join(`/${useDrive.key.toString('hex')}`, useData.key).replace(/\\/g, "/") : useData.key
+          const pathToFile = JSON.parse(reqHeaders.get('x-copy')) ? path.join(`/${useDrive.key.toString('hex')}`, useData.key).replace(/\\/g, "/") : useData.key
             const mainDrive = await checkForDrive(id)
             mainDrive.put(pathToFile, await useDrive.get(useData.key))
-          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${mainDrive.key.toString('hex')}${pathToFile}>; rel="canonical"`}, body: []})
+          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'X-Link': `hyper://${mainDrive.key.toString('hex')}${pathToFile}`, 'Link': `<hyper://${mainDrive.key.toString('hex')}${pathToFile}>; rel="canonical"`}, body: []})
         } else {
-          return sendTheData(signal, {status: 400, headers: {}, body: []})
+          return sendTheData(signal, {status: 400, headers: {'X-Error': 'did not find any file'}, body: []})
         }
       } else {
         const useDrive = await checkForDrive(main.useHost)
@@ -218,14 +182,16 @@ module.exports = async function makeHyperFetch (opts = {}) {
           useDrive.entry(main.usePath),
           new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
         ])
-        if(useData){
-          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`}, body: []})
+        if (useData) {
+          return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useData.value.blob.byteLength}`, 'X-Link': `hyper://${useDrive.key.toString('hex')}${useData.key}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"` }, body: [] })
+        } else if (path.extname(main.usePath)) {
+          return sendTheData(signal, { status: 400, headers: {'X-Error': 'did not find any file'}, body: []})
         } else {
           let useNum = 0
           for await (const test of useDrive.list(main.usePath)){
             useNum = useNum + test.value.blob.byteLength
           }
-          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useNum}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, body: []})
+          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useNum}`, 'X-Link': `hyper://${useDrive.key.toString('hex')}${main.usePath}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`}, body: []})
         }
       }
   }
@@ -240,9 +206,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
       const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
-      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
+      const useTimeOut = (reqHeaders.has('x-timer') && reqHeaders.get('x-timer') !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
 
-      const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
+      const mainReq = !reqHeaders.has('accept') || !reqHeaders.get('accept').includes('application/json')
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
     
       const useDrive = await checkForDrive(main.useHost)
@@ -251,20 +217,22 @@ module.exports = async function makeHyperFetch (opts = {}) {
         new Promise((resolve, reject) => setTimeout(reject, useTimeOut))
       ])
       if(useData){
-        const isRanged = reqHeaders.Range || reqHeaders.range
+        const isRanged = reqHeaders.has('Range') || reqHeaders.has('range')
         if(isRanged){
           const ranges = parseRange(useData.value.blob.byteLength, isRanged)
           // if (ranges && ranges.length && ranges.type === 'bytes') {
           if ((ranges !== -1 && ranges !== -2) && ranges.type === 'bytes') {
             const [{ start, end }] = ranges
             const length = (end - start + 1)
-            return sendTheData(signal, {status: 206, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${useData.value.blob.byteLength}`}, body: useDrive.createReadStream(useData.key, {start, end})})
+            return sendTheData(signal, {status: 206, headers: {'Content-Type': getMimeType(useData.key), 'X-Link': `hyper://${useDrive.key.toString('hex')}${useData.key}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${length}`, 'Content-Range': `bytes ${start}-${end}/${useData.value.blob.byteLength}`}, body: useDrive.createReadStream(useData.key, {start, end})})
           } else {
-            return sendTheData(signal, {status: 400, headers: {'Content-Type': mainRes, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: mainReq ? ['<html><head><title>range</title></head><body><div><p>malformed or unsatisfiable range</p></div></body></html>'] : [JSON.stringify('malformed or unsatisfiable range')]})
+            return sendTheData(signal, {status: 416, headers: {'Content-Type': mainRes, 'X-Link': `hyper://${useDrive.key.toString('hex')}${useData.key}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: mainReq ? ['<html><head><title>range</title></head><body><div><p>malformed or unsatisfiable range</p></div></body></html>'] : [JSON.stringify('malformed or unsatisfiable range')]})
           }
         } else {
-          return sendTheData(signal, {status: 200, headers: {'Content-Type': getMimeType(useData.key), 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: useDrive.createReadStream(useData.key)})
+          return sendTheData(signal, {status: 200, headers: {'Content-Type': getMimeType(useData.key), 'X-Link': `hyper://${useDrive.key.toString('hex')}${useData.key}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${useData.key}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: useDrive.createReadStream(useData.key)})
         }
+      } else if (path.extname(main.usePath)) {
+        return sendTheData(signal, { status: 400, headers: { 'Content-Type': mainRes }, body: mainReq ? ['<html><head><title>range</title></head><body><div><p>did not find any file</p></div></body></html>'] : [JSON.stringify('did not find any file')] })
       } else {
         const arr = []
         for await (const test of useDrive.readdir(main.usePath)){
@@ -277,7 +245,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
             arr.push({key: fold.replace(/\\/g, "/"), type: 'folder'})
           }
         }
-        return sendTheData(signal, {status: 200, headers: {'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${arr.length ? arr.map((data) => {return `<p><a href="hyper://${useDrive.key.toString('hex')}/${data}">${data}</a></p>`}) : '<p>there is no data</p>'}</div></body></html>`] : [JSON.stringify(arr)]})
+        return sendTheData(signal, {status: 200, headers: {'X-Link': `hyper://${useDrive.key.toString('hex')}${useData.key}`, 'Link': `<hyper://${useDrive.key.toString('hex')}${main.usePath}>; rel="canonical"`, 'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${arr.length ? arr.map((data) => {return `<p><a href="hyper://${useDrive.key.toString('hex')}/${data}">${data}</a></p>`}) : '<p>there is no data</p>'}</div></body></html>`] : [JSON.stringify(arr)]})
       }
   }
 
@@ -291,22 +259,16 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
       const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
-      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
+      const useTimeOut = (reqHeaders.has('x-timer') && reqHeaders.get('x-timer') !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
 
-      const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
+      const mainReq = !reqHeaders.has('accept') || !reqHeaders.get('accept').includes('application/json')
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
     
       const useDrive = await checkForDrive(main.useHost)
-      const hasOpt = reqHeaders['x-opt'] || searchParams.has('x-opt')
-      const useOpt = hasOpt ? JSON.parse(reqHeaders['x-opt'] || decodeURIComponent(searchParams.get('x-opt'))) : {}
-      const mainData = await (async () => {
-        if(reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')){
-          return await iterFiles(useDrive, await saveFormData(useDrive, main, body, reqHeaders, useOpt, useTimeOut), useTimeOut, main)
-        } else {
-          return await iterFile(useDrive, await saveFileData(useDrive, main, body, useOpt, useTimeOut), main, useTimeOut)
-        }
-      })()
-      return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(mainData)}</div></body></html>`] : [JSON.stringify(mainData)]})
+      const hasOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt')
+      const useOpt = hasOpt ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
+      const saved = reqHeaders.has('content-type') && reqHeaders.get('content-type').includes('multipart/form-data') ? await saveFormData(useDrive, main, handleFormData(await request.formData()), useOpt, useTimeOut) : await saveFileData(useDrive, main, body, useOpt, useTimeOut)
+      return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes}, body: mainReq ? [`<html><head><title>Fetch</title></head><body><div>${JSON.stringify(saved)}</div></body></html>`] : [JSON.stringify(saved)]})
   }
 
   async function handleDelete(request) {
@@ -319,9 +281,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
       const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
-      const useTimeOut = (reqHeaders['x-timer'] && reqHeaders['x-timer'] !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders['x-timer'] || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
+      const useTimeOut = (reqHeaders.has('x-timer') && reqHeaders.get('x-timer') !== '0') || (searchParams.has('x-timer') && searchParams.get('x-timer') !== '0') ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : DEFAULT_TIMEOUT
 
-      const mainReq = !reqHeaders.accept || !reqHeaders.accept.includes('application/json')
+      const mainReq = !reqHeaders.has('accept') || !reqHeaders.get('accept').includes('application/json')
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
     
       const useDrive = await checkForDrive(main.useHost)
