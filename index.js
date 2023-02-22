@@ -244,6 +244,8 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const hasOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt')
       const useOpt = hasOpt ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
     const saved = reqHeaders.has('content-type') && reqHeaders.get('content-type').includes('multipart/form-data') ? await saveFormData(useDrive, main, handleFormData(await request.formData()), useOpt) : await saveFileData(useDrive, main, body, useOpt)
+    const useKey = useDrive.key.toString('hex')
+    saved.forEach((data, i) => {saved[i] = path.join(`hyper://${useKey}`, data).replace(/\\/g, '/')})
     const useLink = path.join(`hyper://${useDrive.key.toString('hex')}`, main.usePath).replace(/\\/g, '/')
       return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes, 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`}, body: mainReq ? `<html><head><title>Fetch</title></head><body><div>${JSON.stringify(saved)}</div></body></html>` : JSON.stringify(saved)})
   }
