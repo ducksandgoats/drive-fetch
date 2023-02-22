@@ -1,6 +1,6 @@
 {
   "name": "log-fetch",
-  "version": "22.0.7",
+  "version": "22.0.8",
   "description": "Implementation of Fetch that uses the Dat SDK for loading p2p content",
   "bin": {
     "hypercore-fetch": "bin.js"
