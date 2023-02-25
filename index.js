@@ -195,7 +195,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
     const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
 
     const useDrive = await waitForStuff({num: useOpts.timeout, msg: 'drive'}, checkForDrive(main.useHost))
-    if (path.extname) {
+    if (path.extname(main.usePath)) {
       const useData = await useDrive.entry(main.usePath)
       if (useData) {
         const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), useData.key).replace(/\\/g, "/")
