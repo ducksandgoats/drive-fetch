@@ -137,7 +137,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
           const mainDrive = await checkForDrive(id)
           await mainDrive.put(pathToFile, await useDrive.get(useData.key))
           const useHeaders = {}
-          useHeaders['X-Link'] = path.join('hyper://_', pathToFile).replace(/\\/g, "/")
+          useHeaders['X-Link'] = 'hyper://_' + pathToFile.replace(/\\/g, "/")
           useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
           return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, ...useHeaders}, body: ''})
         } else {
@@ -154,7 +154,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         }
         const pathToFolder = path.join(useIdenPath, main.usePath).replace(/\\/g, "/")
         const useHeaders = {}
-        useHeaders['X-Link'] = path.join('hyper://_', pathToFolder).replace(/\\/g, "/")
+        useHeaders['X-Link'] = 'hyper://_' + pathToFolder.replace(/\\/g, "/")
         useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
         return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useNum}`, ...useHeaders }, body: '' })
       }
@@ -163,7 +163,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
       if (path.extname(main.usePath)) {
         const useData = await useDrive.entry(main.usePath)
         if (useData) {
-          const useLink = path.join(`hyper://${useDrive.key.toString('hex')}`, useData.key).replace(/\\/g, "/")
+          const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), useData.key).replace(/\\/g, "/")
           return sendTheData(signal, { status: 200, headers: { 'Content-Length': String(useData.value.blob.byteLength), 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"` }, body: '' })
         } else {
           return sendTheData(signal, {status: 400, headers: {'X-Error': 'did not find any file'}, body: ''})
@@ -173,7 +173,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         for await (const test of useDrive.list(main.usePath)) {
           useNum = useNum + test.value.blob.byteLength
         }
-        const useLink = path.join(`hyper://${useDrive.key.toString('hex')}`, main.usePath).replace(/\\/g, "/")
+        const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, "/")
         return sendTheData(signal, { status: 200, headers: { 'Content-Length': String(useNum), 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"` }, body: '' })
       }
     }
@@ -198,7 +198,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
     if (path.extname) {
       const useData = await useDrive.entry(main.usePath)
       if (useData) {
-        const useLink = path.join(`hyper://${useDrive.key.toString('hex')}`, useData.key).replace(/\\/g, "/")
+        const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), useData.key).replace(/\\/g, "/")
         const isRanged = reqHeaders.has('Range') || reqHeaders.has('range')
         if(isRanged){
           const ranges = parseRange(useData.value.blob.byteLength, reqHeaders.get('Range') || reqHeaders.get('range'))
@@ -217,7 +217,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         return sendTheData(signal, { status: 400, headers: { 'Content-Type': mainRes }, body: mainReq ? '<html><head><title>range</title></head><body><div><p>did not find any file</p></div></body></html>' : JSON.stringify('did not find any file') })
       }
     } else {
-      const useLink = path.join(`hyper://${useDrive.key.toString('hex')}`, main.usePath).replace(/\\/g, "/")
+      const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, "/")
         const arr = []
       for await (const test of useDrive.readdir(main.usePath)) {
           arr.push(path.join('/', test).replace(/\\/g, '/'))
@@ -244,9 +244,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const hasOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt')
       const useOpt = hasOpt ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
     const saved = reqHeaders.has('content-type') && reqHeaders.get('content-type').includes('multipart/form-data') ? await saveFormData(useDrive, main, handleFormData(await request.formData()), useOpt) : await saveFileData(useDrive, main, body, useOpt)
-    const useName = `hyper://${useDrive.key.toString('hex')}`
-    saved.forEach((data, i) => {saved[i] = path.join(useName, data).replace(/\\/g, '/')})
-    const useLink = path.join(useName, main.usePath).replace(/\\/g, '/')
+    const useName = useDrive.key.toString('hex')
+    saved.forEach((data, i) => {saved[i] = 'hyper://' + path.join(useName, data).replace(/\\/g, '/')})
+    const useLink = 'hyper://' + path.join(useName, main.usePath).replace(/\\/g, '/')
       return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes, 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`}, body: mainReq ? `<html><head><title>Fetch</title></head><body><div>${JSON.stringify(saved)}</div></body></html>` : JSON.stringify(saved)})
   }
 
@@ -269,7 +269,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const useData = await useDrive.entry(main.usePath)
       if (useData) {
         await useDrive.del(useData.key)
-        const useLink = path.join(`hyper://${useDrive.key.toString('hex')}`, useData.key).replace(/\\/g, '/')
+        const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), useData.key).replace(/\\/g, '/')
         return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes, 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: mainReq ? `<html><head><title>Fetch</title></head><body><div>${useLink}</div></body></html>` : JSON.stringify(useLink)})
       } else {
         return sendTheData(signal, { status: 400, headers: { 'Content-Type': mainRes }, body: mainReq ? '<html><head><title>range</title></head><body><div><p>did not find any file</p></div></body></html>' : JSON.stringify('did not find any file') })
@@ -280,7 +280,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
           useNum = useNum + test.value.blob.byteLength
           await useDrive.del(test.key)
       }
-      const useLink = path.join(`hyper://${useDrive.key.toString('hex')}`, main.usePath).replace(/\\/g, '/')
+      const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, '/')
       return sendTheData(signal, { status: 200, headers: { 'Content-Type': mainRes, 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`, 'Content-Length': `${useNum}` }, body: mainReq ? `<html><head><title>Fetch</title></head><body><div>${useLink}</div></body></html>` : JSON.stringify(useLink) })
     }
   }
