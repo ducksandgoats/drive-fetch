@@ -102,7 +102,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
   async function saveFormData(drive, mid, data, useOpts) {
     for (const info of data) {
-      await pipelinePromise(Readable.from(info.stream()), drive.createWriteStream(path.join(mid.usePath, info.name).replace(/\\/g, "/"), useOpts))
+      await pipelinePromise(Readable.from(info.stream()), drive.createWriteStream(path.join(mid.usePath, info.webkitRelativePath || info.name).replace(/\\/g, "/"), useOpts))
     }
     return mid.usePath
   }
