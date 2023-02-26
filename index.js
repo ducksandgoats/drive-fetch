@@ -97,17 +97,14 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
   async function saveFileData(drive, main, body, useOpt) {
     await pipelinePromise(Readable.from(body), drive.createWriteStream(main.usePath, useOpt))
-    return [main.usePath]
+    return main.usePath
   }
 
   async function saveFormData(drive, mid, data, useOpts) {
-    const saved = []
     for (const info of data) {
-        const usePath = path.join(mid.usePath, info.name).replace(/\\/g, "/")
-      await pipelinePromise(Readable.from(info.stream()), drive.createWriteStream(usePath, useOpts))
-      saved.push(usePath)
+      await pipelinePromise(Readable.from(info.stream()), drive.createWriteStream(path.join(mid.usePath, info.name).replace(/\\/g, "/"), useOpts))
     }
-    return saved
+    return mid.usePath
   }
 
   function getMimeType (path) {
@@ -243,9 +240,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const useDrive = await checkForDrive(main.useHost)
       const hasOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt')
       const useOpt = hasOpt ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
-    const saved = reqHeaders.has('content-type') && reqHeaders.get('content-type').includes('multipart/form-data') ? await saveFormData(useDrive, main, handleFormData(await request.formData()), useOpt) : await saveFileData(useDrive, main, body, useOpt)
+    const getSaved = reqHeaders.has('content-type') && reqHeaders.get('content-type').includes('multipart/form-data') ? await saveFormData(useDrive, main, handleFormData(await request.formData()), useOpt) : await saveFileData(useDrive, main, body, useOpt)
     const useName = useDrive.key.toString('hex')
-    saved.forEach((data, i) => {saved[i] = 'hyper://' + path.join(useName, data).replace(/\\/g, '/')})
+    const saved = 'hyper://' + path.join(useName, getSaved).replace(/\\/g, '/')
     const useLink = 'hyper://' + path.join(useName, main.usePath).replace(/\\/g, '/')
       return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes, 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`}, body: mainReq ? `<html><head><title>Fetch</title></head><body><div>${JSON.stringify(saved)}</div></body></html>` : JSON.stringify(saved)})
   }
