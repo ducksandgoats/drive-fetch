@@ -136,9 +136,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
           const useHeaders = {}
           useHeaders['X-Link'] = 'hyper://_' + pathToFile.replace(/\\/g, "/")
           useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
-          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, ...useHeaders}, body: ''})
+          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, ...useHeaders}})
         } else {
-          return sendTheData(signal, {status: 400, headers: {'X-Error': 'did not find any file'}, body: ''})
+          return sendTheData(signal, {status: 400, headers: {'X-Error': 'did not find any file'}})
         }
       } else {
         const useIdenPath = JSON.parse(reqHeaders.get('x-copy') || searchParams.get('x-copy')) ? `/${useDrive.key.toString('hex')}` : '/'
@@ -153,7 +153,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
         const useHeaders = {}
         useHeaders['X-Link'] = 'hyper://_' + pathToFolder.replace(/\\/g, "/")
         useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
-        return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useNum}`, ...useHeaders }, body: '' })
+        return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useNum}`, ...useHeaders } })
       }
     } else {
       const useDrive = await waitForStuff({num: useOpts.timeout, msg: 'drive'}, checkForDrive(main.useHost))
@@ -161,9 +161,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
         const useData = await useDrive.entry(main.usePath)
         if (useData) {
           const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), useData.key).replace(/\\/g, "/")
-          return sendTheData(signal, { status: 200, headers: { 'Content-Length': String(useData.value.blob.byteLength), 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"` }, body: '' })
+          return sendTheData(signal, { status: 200, headers: { 'Content-Length': String(useData.value.blob.byteLength), 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"` } })
         } else {
-          return sendTheData(signal, {status: 400, headers: {'X-Error': 'did not find any file'}, body: ''})
+          return sendTheData(signal, {status: 400, headers: {'X-Error': 'did not find any file'}})
         }
       } else {
         let useNum = 0
@@ -171,7 +171,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
           useNum = useNum + test.value.blob.byteLength
         }
         const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, "/")
-        return sendTheData(signal, { status: 200, headers: { 'Content-Length': String(useNum), 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"` }, body: '' })
+        return sendTheData(signal, { status: 200, headers: { 'Content-Length': String(useNum), 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"` } })
       }
     }
   }
