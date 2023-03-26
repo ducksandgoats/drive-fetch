@@ -123,7 +123,8 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
     const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
-    const useOpts = { timeout: reqHeaders.has('x-timer') || searchParams.has('x-timer') ? reqHeaders.get('x-timer') !== '0' || searchParams.get('x-timer') !== '0' ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : undefined : hyperTimeout }
+    const useOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt') ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
+    const useOpts = { ...useOpt, timeout: reqHeaders.has('x-timer') || searchParams.has('x-timer') ? reqHeaders.get('x-timer') !== '0' || searchParams.get('x-timer') !== '0' ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : undefined : hyperTimeout }
     
     if (reqHeaders.has('x-copy') || searchParams.has('x-copy')) {
       const useDrive = await waitForStuff({num: useOpts.timeout, msg: 'drive'}, checkForDrive(main.useHost))
@@ -185,8 +186,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
 
       const { hostname, pathname, protocol, search, searchParams } = new URL(url)
 
-      const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
-      const useOpts = { timeout: reqHeaders.has('x-timer') || searchParams.has('x-timer') ? reqHeaders.get('x-timer') !== '0' || searchParams.get('x-timer') !== '0' ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : undefined : hyperTimeout }
+    const main = formatReq(decodeURIComponent(hostname), decodeURIComponent(pathname))
+    const useOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt') ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
+      const useOpts = { ...useOpt, timeout: reqHeaders.has('x-timer') || searchParams.has('x-timer') ? reqHeaders.get('x-timer') !== '0' || searchParams.get('x-timer') !== '0' ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : undefined : hyperTimeout }
 
       const mainReq = !reqHeaders.has('accept') || !reqHeaders.get('accept').includes('application/json')
     const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
@@ -238,8 +240,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
     
       const useDrive = await checkForDrive(main.useHost)
-      const hasOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt')
-      const useOpt = hasOpt ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
+    const useOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt') ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
     const getSaved = reqHeaders.has('content-type') && reqHeaders.get('content-type').includes('multipart/form-data') ? await saveFormData(useDrive, main, handleFormData(await request.formData()), useOpt) : await saveFileData(useDrive, main, body, useOpt)
     const useName = useDrive.key.toString('hex')
     const saved = 'hyper://' + path.join(useName, getSaved).replace(/\\/g, '/')
@@ -261,13 +262,15 @@ module.exports = async function makeHyperFetch (opts = {}) {
       const mainReq = !reqHeaders.has('accept') || !reqHeaders.get('accept').includes('application/json')
       const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
     
-      const useDrive = await checkForDrive(main.useHost)
+    const useDrive = await checkForDrive(main.useHost)
+    const useOpt = reqHeaders.has('x-opt') || searchParams.has('x-opt') ? JSON.parse(reqHeaders.get('x-opt') || decodeURIComponent(searchParams.get('x-opt'))) : {}
     if (path.extname(main.usePath)) {
       const useData = await useDrive.entry(main.usePath)
       if (useData) {
         await useDrive.del(useData.key)
         const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), useData.key).replace(/\\/g, '/')
-        return sendTheData(signal, {status: 200, headers: {'Content-Type': mainRes, 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: mainReq ? `<html><head><title>Fetch</title></head><body><div>${useLink}</div></body></html>` : JSON.stringify(useLink)})
+        useOpt.deleted = 'success'
+        return sendTheData(signal, {status: 200, headers: {'Status': useOpt.deleted, 'Content-Type': mainRes, 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: mainReq ? `<html><head><title>Fetch</title></head><body><div>${useLink}</div></body></html>` : JSON.stringify(useLink)})
       } else {
         return sendTheData(signal, { status: 400, headers: { 'Content-Type': mainRes }, body: mainReq ? '<html><head><title>range</title></head><body><div><p>did not find any file</p></div></body></html>' : JSON.stringify('did not find any file') })
       }
