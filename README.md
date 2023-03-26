@@ -1,5 +1,8 @@
 # log-fetch
 
+example of how a url looks like using log-fetch
+`hyper://someKeyAsHostname/some/path`
+
 `_` - the drive owned by the user
 `Key` - a public key of a drive
 
