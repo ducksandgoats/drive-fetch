@@ -127,7 +127,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
     const useOpts = { ...useOpt, timeout: reqHeaders.has('x-timer') || searchParams.has('x-timer') ? reqHeaders.get('x-timer') !== '0' || searchParams.get('x-timer') !== '0' ? Number(reqHeaders.get('x-timer') || searchParams.get('x-timer')) * 1000 : undefined : hyperTimeout }
     
     if (reqHeaders.has('x-copy') || searchParams.has('x-copy')) {
-      const useDrive = await waitForStuff({num: useOpts.timeout, msg: 'drive'}, checkForDrive(main.useHost))
+      const useDrive = await waitForStuff({ num: useOpts.timeout, msg: 'drive' }, checkForDrive(main.useHost))
       if (path.extname(main.usePath)) {
         const useData = await useDrive.entry(main.usePath)
         if (useData) {
@@ -137,9 +137,9 @@ module.exports = async function makeHyperFetch (opts = {}) {
           const useHeaders = {}
           useHeaders['X-Link'] = 'hyper://_' + pathToFile.replace(/\\/g, "/")
           useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
-          return sendTheData(signal, {status: 200, headers: {'Content-Length': `${useData.value.blob.byteLength}`, ...useHeaders}, body: ''})
+          return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useData.value.blob.byteLength}`, ...useHeaders }, body: '' })
         } else {
-          return sendTheData(signal, {status: 400, headers: {'X-Error': 'did not find any file'}, body: ''})
+          return sendTheData(signal, { status: 400, headers: { 'X-Error': 'did not find any file' }, body: '' })
         }
       } else {
         const useIdenPath = JSON.parse(reqHeaders.get('x-copy') || searchParams.get('x-copy')) ? `/${useDrive.key.toString('hex')}` : '/'
@@ -155,6 +155,36 @@ module.exports = async function makeHyperFetch (opts = {}) {
         useHeaders['X-Link'] = 'hyper://_' + pathToFolder.replace(/\\/g, "/")
         useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
         return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useNum}`, ...useHeaders }, body: '' })
+      }
+    } else if (reqHeaders.has('x-load') || searchParams.has('x-load')) {
+      const useDrive = await waitForStuff({ num: useOpts.timeout, msg: 'drive' }, checkForDrive(main.useHost))
+      if (path.extname(main.usePath)) {
+        if (JSON.parse(reqHeaders.get('x-load') || searchParams.get('x-load'))) {
+          const useData = await useDrive.entry(main.usePath)
+          await useDrive.get(main.usePath)
+          const useHeaders = {}
+          useHeaders['X-Link'] = `hyper://${useDrive.key.toString('hex')}${main.usePath}`
+          useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
+          return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useData.value.blob.byteLength}`, ...useHeaders }, body: '' })
+        } else {
+          await useDrive.del(main.usePath)
+          const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, '/')
+          return sendTheData(signal, {status: 200, headers: {'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`}, body: ''})
+        }
+      } else {
+        if (JSON.parse(reqHeaders.get('x-load') || searchParams.get('x-load'))) {
+          await useDrive.download(main.usePath, useOpts)
+          const useHeaders = {}
+          useHeaders['X-Link'] = `hyper://${useDrive.key.toString('hex')}${main.usePath}`
+          useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
+          return sendTheData(signal, { status: 200, headers: { 'Content-Length': '0', ...useHeaders }, body: '' })
+        } else {
+          for await (const test of useDrive.list(main.usePath)){
+            await useDrive.del(test.key)
+          }
+          const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, '/')
+          return sendTheData(signal, { status: 200, headers: { 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"` }, body: ''})
+        }
       }
     } else {
       const useDrive = await waitForStuff({num: useOpts.timeout, msg: 'drive'}, checkForDrive(main.useHost))
