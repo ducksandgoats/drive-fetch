@@ -158,8 +158,8 @@ module.exports = async function makeHyperFetch (opts = {}) {
       }
     } else if (reqHeaders.has('x-load') || searchParams.has('x-load')) {
       const useDrive = await waitForStuff({ num: useOpts.timeout, msg: 'drive' }, checkForDrive(main.useHost))
-      if (path.extname(main.usePath)) {
-        if (JSON.parse(reqHeaders.get('x-load') || searchParams.get('x-load'))) {
+      if (JSON.parse(reqHeaders.get('x-load') || searchParams.get('x-load'))) {
+        if (path.extname(main.usePath)) {
           const useData = await useDrive.entry(main.usePath)
           await useDrive.get(main.usePath)
           const useHeaders = {}
@@ -167,17 +167,17 @@ module.exports = async function makeHyperFetch (opts = {}) {
           useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
           return sendTheData(signal, { status: 200, headers: { 'Content-Length': `${useData.value.blob.byteLength}`, ...useHeaders }, body: '' })
         } else {
-          await useDrive.del(main.usePath)
-          const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, '/')
-          return sendTheData(signal, {status: 200, headers: {'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`}, body: ''})
-        }
-      } else {
-        if (JSON.parse(reqHeaders.get('x-load') || searchParams.get('x-load'))) {
           await useDrive.download(main.usePath, useOpts)
           const useHeaders = {}
           useHeaders['X-Link'] = `hyper://${useDrive.key.toString('hex')}${main.usePath}`
           useHeaders['Link'] = `<${useHeaders['X-Link']}>; rel="canonical"`
           return sendTheData(signal, { status: 200, headers: { 'Content-Length': '0', ...useHeaders }, body: '' })
+        }
+      } else {
+        if (path.extname(main.usePath)) {
+          await useDrive.del(main.usePath)
+          const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, '/')
+          return sendTheData(signal, {status: 200, headers: {'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`}, body: ''})
         } else {
           for await (const test of useDrive.list(main.usePath)){
             await useDrive.del(test.key)
