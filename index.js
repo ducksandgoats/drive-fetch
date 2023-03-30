@@ -243,7 +243,7 @@ module.exports = async function makeHyperFetch (opts = {}) {
           return sendTheData(signal, {status: 200, headers: {'Content-Type': getMimeType(useData.key), 'X-Link': useLink, 'Link': `<${useLink}>; rel="canonical"`, 'Content-Length': `${useData.value.blob.byteLength}`}, body: useDrive.createReadStream(useData.key)})
         }
       } else {
-        return sendTheData(signal, { status: 400, headers: { 'Content-Type': mainRes }, body: mainReq ? '<html><head><title>range</title></head><body><div><p>did not find any file</p></div></body></html>' : JSON.stringify('did not find any file') })
+        return sendTheData(signal, { status: 400, headers: { 'Content-Type': mainRes }, body: mainReq ? `<html><head><title>hyper://${main.useHost}${main.usePath}</title></head><body><div><p>did not find any file</p></div></body></html>` : JSON.stringify('did not find any file') })
       }
     } else {
       const useLink = 'hyper://' + path.join(useDrive.key.toString('hex'), main.usePath).replace(/\\/g, "/")
