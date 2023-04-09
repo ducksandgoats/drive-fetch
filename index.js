@@ -320,7 +320,13 @@ module.exports = async function makeHyperFetch (opts = {}) {
   router.post('hyper://*/**', handlePost)
   router.delete('hyper://*/**', handleDelete)
 
-  fetch.close = async () => {return await app.close()}
+  fetch.close = async () => {
+    for (const drive of drives.values()) {
+      await drive.close()
+    }
+    drives.clear()
+    return await app.close()
+  }
 
   return fetch
 }
